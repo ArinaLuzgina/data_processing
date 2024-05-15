@@ -1,83 +1,106 @@
 import RPi.GPIO as GPIO
-import matplotlib.pyplot as plt
 import time
-
-def dectobin(value):
-    return [int(i) for i in bin(value)[2:].zfill(8)]
-
-def adc():
-    level = 0
-    for i in range(bits - 1, -1, -1):
-        level += 2**i
-        GPIO.output(dac, dectobin(level))
-        time.sleep(0.01)
-        comp_val  = GPIO.input(comp)
-        if (comp_val == 0):
-            level -= 2**i
-    return level
-
-def num2_dac_leds(value):
-    signal = dectobin(value)
-    GPIO.output(dac, signal)
-    return signal
-
-dac = [26, 19, 13, 6, 5, 11, 9, 10]
-leds = [24, 25, 8, 7, 12, 16, 20, 21]
-comp = 4
-troyka = 17
-bits = len(dac)
-levels = 2 ** bits
-maxV = 3.3
+from matplotlib import pyplot as plt
 
 GPIO.setmode(GPIO.BCM)
 
-GPIO.setup(troyka, GPIO.OUT, initial=GPIO.LOW)
-GPIO.setup(dac, GPIO.OUT)
+
+leds = [2, 3, 4, 17, 27, 22, 10, 9]
+dac = [8, 11, 7, 1, 0, 5, 12, 6]
+
+bits = len(dac)
+levels = 2**bits
+comp = 14
+troyka = 13
+
+GPIO.setup(leds, GPIO.OUT)
+GPIO.setup(dac, GPIO.OUT, initial = GPIO.HIGH)
 GPIO.setup(comp, GPIO.IN)
+GPIO.setup(troyka, GPIO.OUT, initial = GPIO.HIGH)
 
-GPIO.output(troyka, 0)
+#функция перевода в двоичную
+def decimal2binary(value):
+    return [int(element) for element in bin(value)[2:].zfill(8)]
 
-data_volts = []
-data_times = []
+#функция АЦП
+def adc():
+    value_res = 0 
+    temp_value = 0
+    for i in range(8):
+        pow2 = 2 ** (8 - i - 1)
+        temp_value = value_res + pow2
+        signal = decimal2binary(temp_value)
+        GPIO.output(dac, signal)
+        time.sleep(0.005)
+        compVal = GPIO.input(comp)
+        if compVal == 0:
+            value_res = value_res + pow2
+    return value_res
+
+
 
 try:
-    start_time = time.time()
-    val = 0
-    while(val < 250):
-        val = adc()
-        print(" volts - {:3}".format(val / levels * maxV))
-        num2_dac_leds(val)
-        data_volts.append(val)
-        data_times.append(time.time() - start_time)
+    time_start = time.time()
+    count = 0
+    data = []
+    data1 = []
+    time_list = []
+    voltage = 0
 
-    GPIO.output(troyka, 1)
+    #Зарядка конденсатора
+    print('Зарядка конденсатора')
+    while voltage <= 206:
+        voltage = adc()
+        print(voltage)
+        data1.append(voltage)
+        data.append(voltage/256*3.3)
+        time_list.append(time.time() - time_start)
+        time.sleep(0)
+        count+=1
+        GPIO.output(leds, decimal2binary(voltage))
 
-    while(val > 64):
-        val = adc()
-        print(" volts - {:3}".format(val/levels * maxV))
-        num2_dac_leds(val)
-        data_volts.append(val)
-        data_times.append(time.time() - start_time)
+    GPIO.output(troyka, 0)
 
-    end_time = time.time()
+    #Разрядка конденсатора
+    print('Разрядка конденсатора')
+    while voltage >= 169:
+        voltage = adc()
+        print(voltage)
+        data1.append(voltage)
+        data.append(voltage/256*3.3)
+        time_list.append(time.time() - time_start)
+        time.sleep(0)
+        count+=1
+        GPIO.output(leds, decimal2binary(voltage))
+    
 
-    with open("./settings.txt", "w") as file:
-        file.write(str((end_time - start_time) / len(data_volts)))
-        file.write(("\n"))
-        file.write(str(maxV / 256))
+    #Ищем полное время эксперимента
+    time_end = time.time()
+    time_total = time_end - time_start
 
-    print(end_time - start_time, " secs\n", len(data_volts) / (end_time - start_time), "\n", maxV / 256)
+    print('Графики')
+
+    #Строим графики
+    plt.plot(time_list, data)
+    plt.xlabel("Время")
+    plt.ylabel("Напряжение")
+    plt.show()
+
+    print('Запись в файл')
+
+    #Запись в файл
+    with open('data.txt', "w") as f:
+        for i in data1:
+            f.write(str(i) + '\n')
+
+    with open('settings.txt', "w") as f:
+        f.write('Частота дискретизации ' + str(1/time_total*count) + ' Гц ' + '\n')
+        f.write('Шаг квантования 0.0129 В')
+
+    print('Завершение программы')
 
 finally:
-    GPIO.output(dac, GPIO.LOW)
-    GPIO.output(troyka, GPIO.LOW)
+    GPIO.output(leds, 0)
+    GPIO.output(dac, 0)
     GPIO.cleanup()
-
-data_times_str = [str(item) for item in data_times]
-data_volts_str = [str(item) for item in data_volts]
-
-with open("data.txt", "w") as file:
-    file.write("\n".join(data_volts_str))
-
-plt.plot(data_times, data_volts)
-plt.show()
+    count = 0
