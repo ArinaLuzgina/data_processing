@@ -1,65 +1,58 @@
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 import numpy as np
-from matplotlib.ticker import MultipleLocator
-import math
 
-with open("./settings.txt", "r") as settings_file:
-    settings_data = [float(num) for num in settings_file.read().split("\n")]
+#Работа с данными
+with open("settings.txt", "r") as settings:
+    tmp = [float(i) for i in settings.read().split("\n")]
 
-data_arr = np.loadtxt("./data.txt", dtype=int)
+data_array = np.loadtxt("data.txt", dtype = int)
+data_array = data_array / 256 * 3.3
 
-volt_step = settings_data[1]
-time_step = settings_data[0]
+x_array = []
+for i in range(len(data_array)):
+    x_array.append(i / tmp[0])
 
-volt_arr = data_arr * volt_step
-time_arr = np.arange(0, len(data_arr)) * time_step
+data_array = list(data_array)
+x_array = list(x_array)
 
-volt_max     = np.max(volt_arr)
-volt_max_ind = np.argmax(volt_arr)
-time_max     = np.max(time_arr)
-time_max_ind = np.argmax(time_arr)
+#Строим график
+app = plt.plot(x_array, data_array, "-", c = [1, 0.5, 0], linewidth=2, label='Напряжение на \n конденсаторе')
 
-charge_data = [time_arr[0:volt_max_ind:], volt_arr[0:volt_max_ind:]]
-discharge_data = [time_arr[volt_max_ind::], volt_arr[volt_max_ind::]]
+#Текст, заголовок, легенда
+plt.text(7, 0.6, "Время зарядки: 7.4 с \nВремя разрядки: 5.2 с", fontsize=12)
+plt.title("График напряжения на конденсаторе")
+plt.legend ()
 
-figure, axes = plt.subplots(figsize = (16, 10), dpi = 400)
+#Сетка
+plt.minorticks_on() 
+plt.grid(visible=True, which='major', linestyle='-', linewidth=1.5, color='0.7')
+plt.grid(visible=True, which='minor', linestyle='--', linewidth=1, color='0.8') 
+plt.rc('text', usetex=True)
+plt.rc('text.latex', preamble=r'\usepackage[english, russian]{babel}') 
 
-axes.set_xlabel("Time, s", fontsize = 16)
-axes.set_ylabel("Voltage, V", fontsize = 16)
-axes.set_title("Capacitor charge-discharge graph in RC-circuit", fontsize = 20)
+#Оси, подготовка
+axis_lw = 2
+ax = plt.gca() 
+ax.set_xlim([0, 13]) 
+ax.set_ylim([0, 3.0])
+ax.set_xlabel("Время, c") 
+ax.set_ylabel("Напряжение, B") 
 
-charge_plot_line   , = axes.plot(charge_data[0], charge_data[1], color = 'blue')
-discharge_plot_line, = axes.plot(discharge_data[0], discharge_data[1], color = 'red')
+#Оси, продолжение
+plt.rc('axes', linewidth=axis_lw) 
+plt.rc('xtick.major', width=axis_lw)
+plt.rc('xtick.minor', width=0) 
+plt.rc('xtick', direction='in') 
+plt.rc('axes', labelsize=20) 
+plt.rc('ytick.major', width=axis_lw)
+plt.rc('ytick.minor', width=0)
+plt.rc('ytick', direction='in')
+plt.rc('xtick', labelsize=18) 
+plt.rc('ytick', labelsize=18)
+plt.rc('xtick.major', pad=10) 
+plt.rc('ytick.major', pad=10)
 
-charge_plot_line.set_label("Capacitor charge")
-discharge_plot_line.set_label("Capacitor discharge")
-axes.legend(prop={"size":16})
+#Сохраняем
+plt.savefig("test.png")
 
-x_limits = (0.0, math.ceil(time_max))
-y_limits = (0.0, 3.5)
-axes.set(xlim = x_limits, ylim = y_limits)
-
-axes.xaxis.set_minor_locator(MultipleLocator(0.5))
-axes.xaxis.set_major_locator(MultipleLocator(1.0))
-axes.yaxis.set_minor_locator(MultipleLocator(0.25))
-axes.yaxis.set_major_locator(MultipleLocator(0.5))
-axes.grid(color = "blue", which = "both", linestyle = ':', linewidth = 0.5)
-
-charge_time    = time_arr[volt_max_ind] - time_arr[0]
-discharge_time = time_arr[-1] - time_arr[volt_max_ind]
-
-axes.axvline(x = charge_time, ymin=y_limits[0], ymax = volt_max/y_limits[1], color = 'green', linestyle='dashed')
-axes.axhline(y = volt_max, xmin=x_limits[0], xmax = charge_time/x_limits[1], color = 'green', linestyle='dashed')
-
-axes.scatter(time_arr[volt_max_ind], volt_max, color='green')
-
-axes.scatter(x = charge_time, y = 0.0, color='green')
-axes.text(x=charge_time+0.1, y = 0.05, s=str(round(charge_time, 2)), fontsize = 12)
-
-axes.scatter(x = 0.0, y = volt_max, color = 'green')
-axes.text(x = 0.1, y = volt_max+0.05, s = str(round(volt_max, 2)), fontsize = 12)
-
-axes.text(x = (charge_time/2-0.8), y = volt_max/2, s = ("Charge time: " + str(round(charge_time, 2)) + " s"), color = 'blue', fontsize = 14)
-axes.text(x = (charge_time+discharge_time/2-0.8), y = volt_max/2, s = ("Discharge time: " + str(round(discharge_time, 2)) + " s"), color = 'red', fontsize = 14)
-
-figure.savefig("graph.svg")
+plt.show()
